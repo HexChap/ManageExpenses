@@ -33,8 +33,11 @@ def include_routers():
     Routers must contain the **router** variable \n
     If router's name starts with "_" it won't be included
     """
+    common = importlib.import_module(f"wrap.routers.common")  # Prioritize the cancel handler
+    dp.include_router(common.router)
+
     for module_name in os.listdir(Path("wrap") / "routers"):
-        if module_name.startswith("_") or not module_name.endswith(".py"):
+        if module_name.startswith("_") or not module_name.endswith(".py") or module_name == "common.py":
             continue
 
         module = importlib.import_module(f"wrap.routers.{module_name.removesuffix('.py')}")

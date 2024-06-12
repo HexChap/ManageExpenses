@@ -4,6 +4,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import default_state
 from aiogram.types import Message, ReplyKeyboardRemove
 
+from wrap.apps.categories import CategoryCRUD, CategoryPayload
+
 router = Router(name=__name__)
 
 
