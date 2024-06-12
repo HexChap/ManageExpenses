@@ -1,3 +1,5 @@
+from pydantic import BaseModel
+
 from wrap.core import BasePydantic
 
 
@@ -7,6 +9,6 @@ class CategorySchema(BasePydantic):
     name: str
 
 
-class CategoryPayload(BasePydantic):
+class CategoryPayload(BaseModel):
     name: str
     user_id: int | None

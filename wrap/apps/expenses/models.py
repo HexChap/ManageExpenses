@@ -14,3 +14,6 @@ class Expense(AbstractModel):
     )
     value = fields.DecimalField(10, 2)
     user_id = fields.CharField(max_length=64)
+
+    class Meta:
+        table = "expenses"
