@@ -14,4 +14,4 @@ class ExpenseSchema(BasePydantic):
 class ExpensePayload(BaseModel):
     category_id: int
     user_id: int
-    value: str
+    value: Decimal
