@@ -14,7 +14,7 @@ from wrap.apps.expenses import ExpenseCRUD
 from wrap.apps.expenses.schemas import ExpensePayload
 from wrap.routers.expenses import router
 
-VALUE_REGEX = re.compile("^\d{1,10}[\.,]?\d{1,2}$")
+VALUE_REGEX = re.compile("^\d{0,10}[\.,]?\d{0,2}$")
 
 
 class CreateExpense(StatesGroup):

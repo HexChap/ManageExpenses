@@ -1,8 +1,13 @@
 from datetime import datetime
+from io import BytesIO
+
+from aiogram.types import BufferedInputFile
+from matplotlib import pyplot as plt
 
 import pytz
 from aiogram import types, filters, md
 from aiogram.utils.formatting import Text, as_marked_list, as_section, as_marked_section, as_list, Bold, Code
+from matplotlib.figure import Figure
 from tortoise import timezone
 
 from . import router
@@ -24,6 +29,18 @@ async def map_cat_to_expense(expenses: list[Expense]):
     return cat_to_expense
 
 
+def create_expenses_pie(cat_to_expenses: dict[Category, list[Expense]]):
+    labels = [cat.name for cat in cat_to_expenses.keys()]
+    sizes = [sum([expense.value for expense in expenses]) for expenses in cat_to_expenses.values()]
+    fig, ax = plt.subplots()
+    ax.pie(sizes, labels=list(labels), autopct='%1.1f%%')
+
+    buffer = BytesIO()
+    fig.savefig(buffer, format="png")
+
+    return buffer
+
+
 @router.message(filters.Command("expenses"))
 async def get_categories(message: types.Message):
     user_tz = await UserCRUD.get_tz(message.from_user.id)
@@ -38,14 +55,18 @@ async def get_categories(message: types.Message):
 
     expenses.sort(key=lambda e: e.category_id)
 
-    cat_to_expenses = await map_cat_to_expense(expenses)
-
     if not expenses:
-        await message.answer(f"🕳 You still don't have any expenses! Create one with " + md.quote('/create_expense'))
+        await message.answer(f"🕳 You still don't have any expenses for today! Create one with " + md.quote('/create_expense'))
         return
 
-    await message.answer(
-        **as_list(
+    cat_to_expenses = await map_cat_to_expense(expenses)
+    result_buffer = create_expenses_pie(cat_to_expenses)
+
+    result_buffer.seek(0)
+    await message.bot.send_photo(
+        chat_id=message.from_user.id,
+        photo=BufferedInputFile(result_buffer.read(), filename="pie.jpg"),
+        caption=as_list(
             as_section(
                 f"🗂 You have {len(expenses)} expenses for today.\n",
                 as_list(
@@ -65,5 +86,7 @@ async def get_categories(message: types.Message):
             ),
             Text(f"📊 Total for today: {sum([expense.value for expense in expenses])}BGN"),
             sep="\n\n"
-        ).as_kwargs()
+        ).as_html(),
+        parse_mode="HTML"
     )
+    result_buffer.close()
