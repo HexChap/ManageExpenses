@@ -2,6 +2,7 @@ import asyncio
 import importlib
 import os
 from pathlib import Path
+from types import ModuleType
 
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
@@ -23,9 +24,18 @@ async def init_database():
 
     await Tortoise.init(
         modules={"models": models},
-        db_url=settings.db_url
+        db_url=settings.db_url,
+        use_tz=True
     )
     await Tortoise.generate_schemas()
+
+
+def load_handlers(router_name: str, router_dir: str | Path):
+    for module_name in os.listdir(router_dir):
+        if module_name.startswith("_"):
+            continue
+
+        importlib.import_module(f"{router_name}.{module_name.removesuffix('.py')}")
 
 
 def include_routers():
@@ -37,12 +47,15 @@ def include_routers():
     dp.include_router(common.router)
 
     for module_name in os.listdir(Path("wrap") / "routers"):
-        if module_name.startswith("_") or not module_name.endswith(".py") or module_name == "common.py":
+        if module_name.startswith("_") or module_name.endswith(".py"):
             continue
 
-        module = importlib.import_module(f"wrap.routers.{module_name.removesuffix('.py')}")
+        router_path = f"wrap.routers.{module_name}"
+        router_module = importlib.import_module(router_path)
 
-        dp.include_router(module.router)
+        load_handlers(router_path, Path(router_module.__file__).parent)
+
+        dp.include_router(router_module.router)
 
 
 async def main():

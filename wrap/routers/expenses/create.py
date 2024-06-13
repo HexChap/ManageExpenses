@@ -1,18 +1,19 @@
 import re
-from re import Pattern
+from decimal import Decimal
 
-from _decimal import Decimal
-from aiogram import Router, filters, F, types, md
+from aiogram import filters, F, types, md
 from aiogram.fsm.context import FSMContext
+
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.formatting import Text, Bold
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
+from aiogram.utils.text_decorations import markdown_decoration
 
 from wrap.apps.categories import CategoryCRUD
 from wrap.apps.expenses import ExpenseCRUD
 from wrap.apps.expenses.schemas import ExpensePayload
+from wrap.routers.expenses import router
 
-router = Router(name=__name__)
 VALUE_REGEX = re.compile("^\d{1,10}[\.,]?\d{1,2}$")
 
 
@@ -46,7 +47,7 @@ async def create_expense(message: types.Message, state: FSMContext):
     await state.set_state(CreateExpense.choosing_category)
 
 
-@router.message(filters.StateFilter(CreateExpense.choosing_category))
+@router.message(CreateExpense.choosing_category)
 async def process_category(message: types.Message, state: FSMContext):
     categories: list = (await state.get_data())["categories"]
 
@@ -80,7 +81,7 @@ async def process_value(message: types.Message, state: FSMContext):
     category = (await state.get_data())["category"]
     value = message.text.replace(",", ".")
 
-    await ExpenseCRUD.create_by(
+    expense = await ExpenseCRUD.create_by(
         ExpensePayload(
             category_id=category.id,
             user_id=message.from_user.id,
