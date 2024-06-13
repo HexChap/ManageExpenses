@@ -6,6 +6,7 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from tortoise import timezone
 
+from wrap.apps.users import UserCRUD, UserPayload, UserUpdate
 from wrap.routers.misc import router
 
 
@@ -82,10 +83,19 @@ async def process_continent(message: types.Message, state: FSMContext):
         await message.answer("❌ I can't recognise this timezone. Please, choose one from the keyboard")
         return
 
+    tz = "/".join([continent, message.text])
+    tg_id = message.from_user.id
+    await UserCRUD.model.get_or_create(
+        defaults=UserUpdate(timezone=tz).model_dump(),
+        tg_id=tg_id
+    )
+    await UserCRUD.update_by(UserUpdate(timezone=tz), tg_id=tg_id)
+
     await message.answer(
-        "✅ Great! Profile's timezone updated!"
+        "✅ Great! Profile's timezone updated!",
+        reply_markup=types.ReplyKeyboardRemove()
     )
 
-    #  pytz.timezone("/".join([continent, message.text]))
+    #  pytz.timezone()
 
     await state.clear()
