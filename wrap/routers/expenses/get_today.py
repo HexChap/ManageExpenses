@@ -1,17 +1,13 @@
 from datetime import datetime
 from io import BytesIO
 
+from aiogram import types, filters, md
 from aiogram.types import BufferedInputFile
+from aiogram.utils.formatting import Text, as_section, as_marked_section, as_list, Bold
 from matplotlib import pyplot as plt
 
-import pytz
-from aiogram import types, filters, md
-from aiogram.utils.formatting import Text, as_marked_list, as_section, as_marked_section, as_list, Bold, Code
-from matplotlib.figure import Figure
-from tortoise import timezone
-
-from . import router
 from wrap.apps.expenses import ExpenseCRUD, Expense
+from . import router
 from ...apps.categories import Category
 from ...apps.users import UserCRUD
 
@@ -87,6 +83,14 @@ async def get_categories(message: types.Message):
             Text(f"📊 Total for today: {sum([expense.value for expense in expenses])}BGN"),
             sep="\n\n"
         ).as_html(),
+        reply_markup=types.InlineKeyboardMarkup(
+            inline_keyboard=[
+                [types.InlineKeyboardButton(
+                    text="Get Monthly Statistics",
+                    callback_data="get_monthly"
+                )]
+            ]
+        ),
         parse_mode="HTML"
     )
     result_buffer.close()

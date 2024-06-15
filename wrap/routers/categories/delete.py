@@ -45,7 +45,7 @@ async def cat_chosen(message: types.Message, state: FSMContext):
         await message.answer("‼️ Please, choose category from the list below.")
         return
 
-    await CategoryCRUD.delete_by(name=message.text)
+    await CategoryCRUD.delete_by(name=message.text, user_id=message.from_user.id)
 
     await message.answer(
         **Text("✅ Category ", Bold(message.text), " deleted successfully!").as_kwargs()

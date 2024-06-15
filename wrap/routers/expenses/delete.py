@@ -63,6 +63,7 @@ async def expense_chosen(message: types.Message, state: FSMContext):
     await ExpenseCRUD.delete_by(id=state_data["expenses"][expense_texts.index(message.text)].id)
 
     await message.answer(
-        **Text("✅ Category ", Bold(message.text), " deleted successfully!").as_kwargs()
+        **Text("✅ Category ", Bold(message.text), " deleted successfully!").as_kwargs(),
+        reply_markup=types.ReplyKeyboardRemove()
     )
     await state.clear()

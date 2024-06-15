@@ -1,2 +1,5 @@
 tortoise-orm[asyncpg]
 aiogram
+pytz
+pydantic
+matplotlib
