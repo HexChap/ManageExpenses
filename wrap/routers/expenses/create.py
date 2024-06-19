@@ -1,4 +1,5 @@
 import re
+from asyncio import sleep
 from decimal import Decimal
 
 from aiogram import filters, F, types, md
@@ -12,7 +13,8 @@ from aiogram.utils.text_decorations import markdown_decoration
 from wrap.apps.categories import CategoryCRUD
 from wrap.apps.expenses import ExpenseCRUD
 from wrap.apps.expenses.schemas import ExpensePayload
-from wrap.routers.expenses import router
+from wrap.routers.expenses import router, get_today
+from wrap.routers.expenses.get_today import get_daily
 
 VALUE_REGEX = re.compile("^\d{0,10}[\.,]?\d{0,2}$")
 
@@ -24,11 +26,12 @@ class CreateExpense(StatesGroup):
 
 @router.message(filters.Command("create_expense"))
 @router.message(F.text == "📄 Create expense")
-async def create_expense(message: types.Message, state: FSMContext):
-    categories = await CategoryCRUD.filter_by(user_id=message.from_user.id)  # TODO: ReDo with aiogram-dialog?
+@router.callback_query(F.data == "create_expense")
+async def create_expense(data: types.Message | types.CallbackQuery, state: FSMContext):
+    categories = await CategoryCRUD.filter_by(user_id=data.from_user.id)  # TODO: ReDo with aiogram-dialog?
 
     if not categories:
-        await message.answer(f"🕳 You don't have any categories! Create one with " + md.quote('/create_category'))
+        await data.answer(f"🕳 You don't have any categories! Create one with " + md.quote('/create_category'))
         return
 
     builder = ReplyKeyboardBuilder()
@@ -38,13 +41,18 @@ async def create_expense(message: types.Message, state: FSMContext):
     ],
     builder.adjust(2)
 
-    await message.answer(
+    await data.bot.send_message(
+        data.from_user.id,
         "🗂 Select category for your expense.",
         reply_markup=builder.as_markup(resize_keyboard=True, one_time_keyboard=True)
     )
 
     await state.update_data(categories=categories)
     await state.set_state(CreateExpense.choosing_category)
+
+    if isinstance(data, types.CallbackQuery):
+        await data.message.delete()
+        await data.answer()
 
 
 @router.message(CreateExpense.choosing_category)
@@ -89,9 +97,13 @@ async def process_value(message: types.Message, state: FSMContext):
         )
     )
 
-    await message.answer(
+    success = await message.answer(
         **Text(
             "✅ Expense in category ", Bold(category.name), f" for {message.text} created successfully!"
         ).as_kwargs()
     )
     await state.clear()
+
+    await get_daily(message)
+    await sleep(5)
+    await success.delete()

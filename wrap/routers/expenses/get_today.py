@@ -1,13 +1,14 @@
 from datetime import datetime
 from io import BytesIO
 
-from aiogram import types, filters, md
+from aiogram import types, filters, md, F
 from aiogram.types import BufferedInputFile
 from aiogram.utils.formatting import Text, as_section, as_marked_section, as_list, Bold
 from matplotlib import pyplot as plt
 
 from wrap.apps.expenses import ExpenseCRUD, Expense
 from . import router
+from ._keyboards import get_start_kb
 from ...apps.categories import Category
 from ...apps.users import UserCRUD
 
@@ -37,32 +38,41 @@ def create_expenses_pie(cat_to_expenses: dict[Category, list[Expense]]):
     return buffer
 
 
-@router.message(filters.Command("expenses"))
-async def get_categories(message: types.Message):
-    user_tz = await UserCRUD.get_tz(message.from_user.id)
+@router.message(filters.Command(commands=["expenses", "start"]))
+@router.callback_query(F.data == "get_daily")
+@router.callback_query(F.data == "start")
+async def get_daily(data: types.Message | types.CallbackQuery):
+    if isinstance(data, types.CallbackQuery):
+        is_start = data.data == "start"
+    else:
+        is_start = data.text == "/start"
+
+    user_tz = await UserCRUD.get_tz(data.from_user.id)
     now = datetime.now(user_tz)
 
-    expenses: list = await ExpenseCRUD.filter_by(
+    expenses: list = await ExpenseCRUD.model.filter(
         created_at__year=now.year,
         created_at__month=now.month,
         created_at__day=now.day,
-        user_id=message.from_user.id
-    )
-
-    expenses.sort(key=lambda e: e.category_id)
+        user_id=data.from_user.id
+    ).order_by("category_id")
 
     if not expenses:
-        await message.answer(f"🕳 You still don't have any expenses for today! Create one with " + md.quote('/create_expense'))
+        await data.answer(
+            f"🕳 You still don't have any expenses for today!",
+            reply_markup=get_start_kb()
+        )
         return
 
     cat_to_expenses = await map_cat_to_expense(expenses)
     result_buffer = create_expenses_pie(cat_to_expenses)
 
     result_buffer.seek(0)
-    await message.bot.send_photo(
-        chat_id=message.from_user.id,
+    await data.bot.send_photo(
+        chat_id=data.from_user.id,
         photo=BufferedInputFile(result_buffer.read(), filename="pie.jpg"),
         caption=as_list(
+            Text(f"👋 Greetings, {data.from_user.first_name}!") if is_start else Text(),
             as_section(
                 f"🗂 You have {len(expenses)} expenses for today.\n",
                 as_list(
@@ -80,17 +90,15 @@ async def get_categories(message: types.Message):
                     sep="\n\n"
                 ),
             ),
-            Text(f"📊 Total for today: {sum([expense.value for expense in expenses])}BGN"),
-            sep="\n\n"
+            Text(f"📊 Total for today: {sum([expense.value for expense in expenses])}BGN\n"),
+            sep="\n"
         ).as_html(),
-        reply_markup=types.InlineKeyboardMarkup(
-            inline_keyboard=[
-                [types.InlineKeyboardButton(
-                    text="Get Monthly Statistics",
-                    callback_data="get_monthly"
-                )]
-            ]
-        ),
+        reply_markup=get_start_kb(),
         parse_mode="HTML"
     )
+
+    if isinstance(data, types.CallbackQuery):
+        await data.message.delete()
+        await data.answer()
+
     result_buffer.close()

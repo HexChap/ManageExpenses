@@ -1,10 +1,13 @@
-from aiogram import filters, types
+from asyncio import sleep
+
+from aiogram import filters, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.formatting import Text, Bold
 
 from wrap.apps.categories import CategoryCRUD, CategoryPayload
 from wrap.routers.categories import router
+from wrap.routers.expenses.get_today import get_daily
 
 
 class CreateCategory(StatesGroup):
@@ -12,10 +15,15 @@ class CreateCategory(StatesGroup):
 
 
 @router.message(filters.StateFilter(None), filters.Command("create_category"))
-async def create_category(message: types.Message, state: FSMContext):
-    await message.answer("🗂 Enter name for the category: ")
+@router.callback_query(F.data == "create_category")
+async def create_category(data: types.Message | types.CallbackQuery, state: FSMContext):
+    await data.bot.send_message(data.from_user.id, "🗂 Enter name for the category: ")
 
     await state.set_state(CreateCategory.choosing_name)
+
+    if isinstance(data, types.CallbackQuery):
+        await data.message.delete()
+        await data.answer()
 
 
 @router.message(filters.StateFilter(CreateCategory.choosing_name))
@@ -34,7 +42,11 @@ async def cat_name_chosen(message: types.Message, state: FSMContext):
         CategoryPayload(name=message.text, user_id=message.from_user.id)
     )
 
-    await message.answer(
+    success = await message.answer(
         **Text("✅ Category ", Bold(message.text), " created successfully!").as_kwargs()
     )
     await state.clear()
+
+    await get_daily(message)
+    await sleep(5)
+    await success.delete()
