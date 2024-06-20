@@ -32,7 +32,7 @@ async def create_expenses_bar(
     ind = np.arange(days)
     fig, ax = plt.subplots(figsize=(14, 8))
     bars = []
-    labels = set()
+    labels = []
 
     for expense in expenses:
         day = expense.created_at.astimezone(user_tz).day
@@ -41,6 +41,7 @@ async def create_expenses_bar(
     for i, cat_id in enumerate(cat_ids):
         bottom = cat_to_each_day_total[cat_ids[i-1]] if i > 0 else None
 
+        labels.append((await CategoryCRUD.get_by(id=cat_id)).name)
         bars.append(plt.bar(ind, cat_to_each_day_total[cat_id], bottom=bottom))
 
     y_lim = ax.get_ylim()[1]
@@ -76,12 +77,9 @@ async def get_monthly_stat(callback: types.CallbackQuery):
     cat_ids = await CategoryCRUD.model.filter(user_id=tg_id).values_list("id", flat=True)
 
     if not expenses:
-        await message.answer(
-            f"🕳 You still don't have any expenses for this month! Create one with " +
-            md.quote('/create_expense')
+        await callback.answer(
+            f"🕳 You still don't have any expenses for this month!"
         )
-        await message.delete()
-        await callback.answer()
         return
 
     cat_to_expenses = await map_cat_to_expense(expenses)

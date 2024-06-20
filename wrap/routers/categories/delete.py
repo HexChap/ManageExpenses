@@ -1,4 +1,6 @@
-from aiogram import filters, types, md
+from asyncio import sleep
+
+from aiogram import filters, types, md, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.formatting import Text, Bold
@@ -7,6 +9,7 @@ from aiogram.utils.text_decorations import markdown_decoration
 
 from wrap.apps.categories import CategoryCRUD
 from wrap.routers.categories import router
+from wrap.routers.expenses.get_today import get_daily
 
 
 class DeleteCategory(StatesGroup):
@@ -14,11 +17,12 @@ class DeleteCategory(StatesGroup):
 
 
 @router.message(filters.StateFilter(None), filters.Command("delete_category"))
-async def delete_category(message: types.Message, state: FSMContext):
-    categories = await CategoryCRUD.filter_by(user_id=message.from_user.id)
+@router.callback_query(F.data == "delete_category")
+async def delete_category(context: types.Message | types.CallbackQuery, state: FSMContext):
+    categories = await CategoryCRUD.filter_by(user_id=context.from_user.id)
 
     if not categories:
-        await message.answer(f"🕳 You don't have any categories! Create one with " + md.quote('/create_category'))
+        await context.answer(f"🕳 You don't have any categories!")
         return
 
     builder = ReplyKeyboardBuilder()
@@ -28,13 +32,18 @@ async def delete_category(message: types.Message, state: FSMContext):
      ],
     builder.adjust(2)
 
-    await message.answer(
+    await context.bot.send_message(
+        context.from_user.id,
         "🗂 Select a category for deletion.",
         reply_markup=builder.as_markup(resize_keyboard=True, one_time_keyboard=True)
     )
 
     await state.update_data(categories=categories)
     await state.set_state(DeleteCategory.choosing_category)
+
+    if isinstance(context, types.CallbackQuery):
+        await context.message.delete()
+        await context.answer()
 
 
 @router.message(filters.StateFilter(DeleteCategory.choosing_category))
@@ -47,7 +56,11 @@ async def cat_chosen(message: types.Message, state: FSMContext):
 
     await CategoryCRUD.delete_by(name=message.text, user_id=message.from_user.id)
 
-    await message.answer(
+    success = await message.answer(
         **Text("✅ Category ", Bold(message.text), " deleted successfully!").as_kwargs()
     )
     await state.clear()
+
+    await get_daily(message)
+    await sleep(5)
+    await success.delete()

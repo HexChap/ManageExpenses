@@ -41,64 +41,64 @@ def create_expenses_pie(cat_to_expenses: dict[Category, list[Expense]]):
 @router.message(filters.Command(commands=["expenses", "start"]))
 @router.callback_query(F.data == "get_daily")
 @router.callback_query(F.data == "start")
-async def get_daily(data: types.Message | types.CallbackQuery):
-    if isinstance(data, types.CallbackQuery):
-        is_start = data.data == "start"
+async def get_daily(context: types.Message | types.CallbackQuery):
+    if isinstance(context, types.CallbackQuery):
+        is_start = context.data == "start"
     else:
-        is_start = data.text == "/start"
+        is_start = context.text == "/start"
 
-    user_tz = await UserCRUD.get_tz(data.from_user.id)
+    user_tz = await UserCRUD.get_tz(context.from_user.id)
     now = datetime.now(user_tz)
 
     expenses: list = await ExpenseCRUD.model.filter(
         created_at__year=now.year,
         created_at__month=now.month,
         created_at__day=now.day,
-        user_id=data.from_user.id
+        user_id=context.from_user.id
     ).order_by("category_id")
 
     if not expenses:
-        await data.answer(
-            f"🕳 You still don't have any expenses for today!",
-            reply_markup=get_start_kb()
+        await context.bot.send_message(
+            context.from_user.id,
+            Text(f"🕳 You still don't have any expenses for today!").as_html(),
+            reply_markup=get_start_kb(),
+            parse_mode="HTML"
         )
-        return
+    else:
+        cat_to_expenses = await map_cat_to_expense(expenses)
+        result_buffer = create_expenses_pie(cat_to_expenses)
 
-    cat_to_expenses = await map_cat_to_expense(expenses)
-    result_buffer = create_expenses_pie(cat_to_expenses)
-
-    result_buffer.seek(0)
-    await data.bot.send_photo(
-        chat_id=data.from_user.id,
-        photo=BufferedInputFile(result_buffer.read(), filename="pie.jpg"),
-        caption=as_list(
-            Text(f"👋 Greetings, {data.from_user.first_name}!") if is_start else Text(),
-            as_section(
-                f"🗂 You have {len(expenses)} expenses for today.\n",
-                as_list(
-                    *[
-                        as_marked_section(
-                            Bold(cat.name),
-                            *[
-                                 f"At {expense.created_at.astimezone(user_tz).strftime('%H:%M')} "
-                                 f"for {expense.value}BGN"
-                                 for expense in expenses
-                             ] + [Bold(f"> Category total: {sum([expense.value for expense in expenses])}BGN")]
-                        )
-                        for cat, expenses in cat_to_expenses.items()
-                    ],
-                    sep="\n\n"
+        result_buffer.seek(0)
+        await context.bot.send_photo(
+            chat_id=context.from_user.id,
+            photo=BufferedInputFile(result_buffer.read(), filename="pie.jpg"),
+            caption=as_list(
+                Text(f"👋 Greetings, {context.from_user.first_name}!") if is_start else Text(),
+                as_section(
+                    f"🗂 You have {len(expenses)} expenses for today.\n",
+                    as_list(
+                        *[
+                            as_marked_section(
+                                Bold(cat.name),
+                                *[
+                                     f"At {expense.created_at.astimezone(user_tz).strftime('%H:%M')} "
+                                     f"for {expense.value}BGN"
+                                     for expense in expenses
+                                 ] + [Bold(f"> Category total: {sum([expense.value for expense in expenses])}BGN")]
+                            )
+                            for cat, expenses in cat_to_expenses.items()
+                        ],
+                        sep="\n\n"
+                    ),
                 ),
-            ),
-            Text(f"📊 Total for today: {sum([expense.value for expense in expenses])}BGN\n"),
-            sep="\n"
-        ).as_html(),
-        reply_markup=get_start_kb(),
-        parse_mode="HTML"
-    )
+                Text(f"📊 Total for today: {sum([expense.value for expense in expenses])}BGN\n"),
+                sep="\n"
+            ).as_html(),
+            reply_markup=get_start_kb(),
+            parse_mode="HTML"
+        )
+        result_buffer.close()
 
-    if isinstance(data, types.CallbackQuery):
-        await data.message.delete()
-        await data.answer()
-
-    result_buffer.close()
+    if isinstance(context, types.CallbackQuery):
+        await context.message.delete()
+        await context.answer()

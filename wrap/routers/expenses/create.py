@@ -31,7 +31,7 @@ async def create_expense(data: types.Message | types.CallbackQuery, state: FSMCo
     categories = await CategoryCRUD.filter_by(user_id=data.from_user.id)  # TODO: ReDo with aiogram-dialog?
 
     if not categories:
-        await data.answer(f"🕳 You don't have any categories! Create one with " + md.quote('/create_category'))
+        await data.answer(f"🕳 You don't have any categories!")
         return
 
     builder = ReplyKeyboardBuilder()
@@ -72,7 +72,7 @@ async def process_category(message: types.Message, state: FSMContext):
         ][0]
     )
 
-    await message.answer("💸 Enter the value of the expense.")
+    await message.answer("💸 Enter the value of the expense.", reply_markup=types.ReplyKeyboardRemove())
     await state.set_state(CreateExpense.set_value)
 
 
