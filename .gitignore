@@ -2,7 +2,7 @@
 .idea
 
 #local stuff
-launch.sh
+launch.*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

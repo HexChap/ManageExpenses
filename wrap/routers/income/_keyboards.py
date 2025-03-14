@@ -16,24 +16,14 @@ def get_start_kb():
             callback_data="create_expense"
         ),
         types.InlineKeyboardButton(
-            text="Create an Income",
-            callback_data="add_income"
-        )
+            text="Create a Category",
+            callback_data="create_category"
+        ),
     )
     builder.row(
         types.InlineKeyboardButton(
             text="Delete an Expense",
             callback_data="delete_expense"
-        ),
-        types.InlineKeyboardButton(
-            text="Delete an Income",
-            callback_data="delete_income"
-        )
-    )
-    builder.row(
-        types.InlineKeyboardButton(
-            text="Create a Category",
-            callback_data="create_category"
         ),
         types.InlineKeyboardButton(
             text="Delete a Category",

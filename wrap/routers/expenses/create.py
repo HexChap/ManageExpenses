@@ -2,21 +2,19 @@ import re
 from asyncio import sleep
 from decimal import Decimal
 
-from aiogram import filters, F, types, md
+from aiogram import filters, F, types
 from aiogram.fsm.context import FSMContext
-
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.formatting import Text, Bold
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
-from aiogram.utils.text_decorations import markdown_decoration
 
 from wrap.apps.categories import CategoryCRUD
 from wrap.apps.expenses import ExpenseCRUD
 from wrap.apps.expenses.schemas import ExpensePayload
-from wrap.routers.expenses import router, get_today
+from wrap.routers.expenses import router
 from wrap.routers.expenses.get_today import get_daily
 
-VALUE_REGEX = re.compile("^\d{0,10}[\.,]?\d{0,2}$")
+VALUE_REGEX = re.compile(r"^\d{0,10}[\.,]?\d{0,2}$")
 
 
 class CreateExpense(StatesGroup):
@@ -25,7 +23,7 @@ class CreateExpense(StatesGroup):
 
 
 @router.message(filters.Command("create_expense"))
-@router.message(F.text == "📄 Create expense")
+@router.message(F.text == "📄 Create income")
 @router.callback_query(F.data == "create_expense")
 async def create_expense(data: types.Message | types.CallbackQuery, state: FSMContext):
     categories = await CategoryCRUD.filter_by(user_id=data.from_user.id)  # TODO: ReDo with aiogram-dialog?
@@ -99,7 +97,7 @@ async def process_value(message: types.Message, state: FSMContext):
 
     success = await message.answer(
         **Text(
-            "✅ Expense in category ", Bold(category.name), f" for {message.text} created successfully!"
+            "✅ Expense in category ", Bold(category.name), f" for {message.text}BGN created successfully!"
         ).as_kwargs()
     )
     await state.clear()
