@@ -15,45 +15,61 @@ from tortoise.timezone import is_aware
 
 from wrap.apps.expenses import ExpenseCRUD, Expense
 from wrap.apps.users import UserCRUD
+from wrap.apps.categories import Category, CategoryCRUD
+from wrap.apps.incomes import Income, IncomeCRUD
 from . import router
 from ._keyboards import get_daily_kb
 from .get_today import map_cat_to_expense
-from ...apps.categories import Category, CategoryCRUD
 
 
 async def create_expenses_bar(
         expenses: list[Expense],
+        incomes: list[Income],
         cat_ids: list[int],
         days: int,
         user_tz: pytz.tzinfo
 ):
+    # Initialize totals for each category and day
     cat_to_each_day_total = {cat_id: [0 for _ in range(days)] for cat_id in cat_ids}
+    income_each_day_total = [0 for _ in range(days)]  # Totals for incomes per day
 
     ind = np.arange(days)
-    fig, ax = plt.subplots(figsize=(14, 8))
+    width = 0.35  # Width of each bar
+    fig, ax = plt.subplots(figsize=(18, 10))
     bars = []
     labels = []
 
+    # Populate expense totals by category and day
     for expense in expenses:
         day = expense.created_at.astimezone(user_tz).day
         cat_to_each_day_total[expense.category_id][day-1] += float(expense.value)
 
+    # Populate income totals by day
+    for income in incomes:
+        day = income.created_at.astimezone(user_tz).day
+        income_each_day_total[day-1] += float(income.value)
+
+    # Plot expense bars by category
     for i, cat_id in enumerate(cat_ids):
         bottom = cat_to_each_day_total[cat_ids[i-1]] if i > 0 else None
 
         labels.append((await CategoryCRUD.get_by(id=cat_id)).name)
-        bars.append(plt.bar(ind, cat_to_each_day_total[cat_id], bottom=bottom))
+        bars.append(plt.bar(ind - width/2, cat_to_each_day_total[cat_id], width=width, bottom=bottom))  # Shift left for expenses
 
+    # Plot income bars (next to expense bars)
+    income_bar = plt.bar(ind + width/2, income_each_day_total, width=width, label="Income", color='green')  # Shift right for incomes
+
+    # Set Y-axis limit
     y_lim = ax.get_ylim()[1]
-    plt.ylim(0, math.ceil(y_lim / 10) * 10)  # unfix the highest bar from the top
+    plt.ylim(0, math.ceil(y_lim / 10) * 10)  # Unfix the highest bar from the top
 
-    plt.title('Amount spend every day by category')
+    plt.title('Amount Spent and Income Earned Each Day by Category')
     plt.ylabel('Amount')
 
     plt.xticks(ind, tuple(range(1, days+1)))
     plt.legend(
-        tuple(bar[0] for bar in bars),
-        labels
+        tuple(bar[0] for bar in bars) + (income_bar[0],),
+        labels + ["Income"]
     )
 
     buffer = BytesIO()
@@ -74,6 +90,11 @@ async def get_monthly_stat(callback: types.CallbackQuery):
         created_at__month=now.month,
         user_id=tg_id
     ).order_by("created_at")
+    incomes: list = await IncomeCRUD.model.filter(
+        created_at__year=now.year,
+        created_at__month=now.month,
+        user_id=tg_id
+    ).order_by("created_at")
     cat_ids = await CategoryCRUD.model.filter(user_id=tg_id).values_list("id", flat=True)
 
     if not expenses:
@@ -90,6 +111,7 @@ async def get_monthly_stat(callback: types.CallbackQuery):
 
     result_buffer = await create_expenses_bar(
         expenses,
+        incomes,
         cat_ids,
         monthrange(now.year, now.month)[1],
         user_tz
