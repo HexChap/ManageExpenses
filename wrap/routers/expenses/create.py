@@ -64,6 +64,7 @@ async def process_category(message: types.Message, state: FSMContext):
         await message.answer("‼️ Please, choose category from the list below.")
         return
 
+    await state.set_data({})
     await state.update_data(
         category=[
             category
@@ -74,10 +75,8 @@ async def process_category(message: types.Message, state: FSMContext):
 
     if value := data.get("value", None):  # If value is already set (by qr for example)
         if isinstance(value, Decimal):
-            await finish_expense_create(message, state, message.text, value)
+            await finish_expense_create(message, state, value)
             return
-
-    await state.set_data({})
 
     await message.answer("💸 Enter the value of the expense.", reply_markup=types.ReplyKeyboardRemove())
     await state.set_state(CreateExpense.set_value)
@@ -98,7 +97,7 @@ async def process_value(message: types.Message, state: FSMContext):
     await finish_expense_create(message, state, value)
 
 
-async def finish_expense_create(message: types.Message, state, category_name: str, value: Decimal):
+async def finish_expense_create(message: types.Message, state, value: Decimal):
     category = (await state.get_data())["category"]
 
     await ExpenseCRUD.create_by(
@@ -111,7 +110,7 @@ async def finish_expense_create(message: types.Message, state, category_name: st
 
     success = await message.answer(
         **Text(
-            "✅ Expense in category ", Bold(category_name), f" for {value}BGN created successfully!"
+            "✅ Expense in category ", Bold(category.name), f" for {value}BGN created successfully!"
         ).as_kwargs()
     )
     await state.clear()
