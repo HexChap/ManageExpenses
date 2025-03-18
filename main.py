@@ -1,14 +1,14 @@
 import asyncio
 import importlib
-import os
 from pathlib import Path
-from types import ModuleType
+import logging
+import os
+import sys
 
+from aiogram import Dispatcher, Bot
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.filters import Command
 from tortoise import Tortoise
-from aiogram import Dispatcher, Bot
 
 from wrap.core import settings
 
@@ -61,8 +61,13 @@ def include_routers():
 async def main():
     bot = Bot(settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN))
 
+    logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+
     await init_database()
     include_routers()
+
+    await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
+
 
 asyncio.run(main())

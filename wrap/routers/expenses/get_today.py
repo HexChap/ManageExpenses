@@ -2,6 +2,7 @@ from datetime import datetime
 from io import BytesIO
 
 from aiogram import types, filters, md, F
+from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import BufferedInputFile
 from aiogram.utils.formatting import Text, as_section, as_marked_section, as_list, Bold
 from matplotlib import pyplot as plt

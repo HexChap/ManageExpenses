@@ -18,8 +18,10 @@ VALUE_REGEX = re.compile(r"^\d{0,10}[\.,]?\d{0,2}$")
 
 
 class CreateExpense(StatesGroup):
+    start = State()
     choosing_category = State()
     set_value = State()
+    finish = State()  # So that if qr is scanned it can go straight to finish
 
 
 @router.message(filters.Command("create_expense"))
@@ -55,13 +57,13 @@ async def create_expense(data: types.Message | types.CallbackQuery, state: FSMCo
 
 @router.message(CreateExpense.choosing_category)
 async def process_category(message: types.Message, state: FSMContext):
-    categories: list = (await state.get_data())["categories"]
+    data = await state.get_data()
+    categories: list = data["categories"]
 
     if message.text not in [category.name for category in categories]:
         await message.answer("‼️ Please, choose category from the list below.")
         return
 
-    await state.set_data({})
     await state.update_data(
         category=[
             category
@@ -69,6 +71,13 @@ async def process_category(message: types.Message, state: FSMContext):
             if category.name == message.text
         ][0]
     )
+
+    if value := data.get("value", None):  # If value is already set (by qr for example)
+        if isinstance(value, Decimal):
+            await finish_expense_create(message, state, message.text, value)
+            return
+
+    await state.set_data({})
 
     await message.answer("💸 Enter the value of the expense.", reply_markup=types.ReplyKeyboardRemove())
     await state.set_state(CreateExpense.set_value)
@@ -84,20 +93,25 @@ async def process_value(message: types.Message, state: FSMContext):
         )
         return
 
-    category = (await state.get_data())["category"]
-    value = message.text.replace(",", ".")
+    value = Decimal(message.text.replace(",", "."))
 
-    expense = await ExpenseCRUD.create_by(
+    await finish_expense_create(message, state, value)
+
+
+async def finish_expense_create(message: types.Message, state, category_name: str, value: Decimal):
+    category = (await state.get_data())["category"]
+
+    await ExpenseCRUD.create_by(
         ExpensePayload(
             category_id=category.id,
             user_id=message.from_user.id,
-            value=Decimal(value)
+            value=value
         )
     )
 
     success = await message.answer(
         **Text(
-            "✅ Expense in category ", Bold(category.name), f" for {message.text}BGN created successfully!"
+            "✅ Expense in category ", Bold(category_name), f" for {value}BGN created successfully!"
         ).as_kwargs()
     )
     await state.clear()
