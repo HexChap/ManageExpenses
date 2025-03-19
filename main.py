@@ -66,7 +66,9 @@ async def main():
     await init_database()
     include_routers()
 
-    await bot.delete_webhook(drop_pending_updates=True)
+    if settings.drop_pending:
+        await bot.delete_webhook(drop_pending_updates=True)
+
     await dp.start_polling(bot)
 
 

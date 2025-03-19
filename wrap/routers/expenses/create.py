@@ -1,3 +1,4 @@
+import logging
 import re
 from asyncio import sleep
 from decimal import Decimal
@@ -8,7 +9,7 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.utils.formatting import Text, Bold
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
-from wrap.apps.categories import CategoryCRUD
+from wrap.apps.categories import CategoryCRUD, Category
 from wrap.apps.expenses import ExpenseCRUD
 from wrap.apps.expenses.schemas import ExpensePayload
 from wrap.routers.expenses import router
@@ -58,25 +59,29 @@ async def create_expense(data: types.Message | types.CallbackQuery, state: FSMCo
 @router.message(CreateExpense.choosing_category)
 async def process_category(message: types.Message, state: FSMContext):
     data = await state.get_data()
-    categories: list = data["categories"]
+    cat_matches: list = [
+        category
+        for category in data["categories"]
+        if category.name == message.text
+    ]
 
-    if message.text not in [category.name for category in categories]:
+    if not cat_matches:
         await message.answer("‼️ Please, choose category from the list below.")
         return
 
-    await state.set_data({})
-    await state.update_data(
-        category=[
-            category
-            for category in categories
-            if category.name == message.text
-        ][0]
-    )
+    if len(cat_matches) > 1:
+        logging.error("Multiple categories found. Aborting " + str(cat_matches))
+        return
+
+    category = cat_matches[0]
 
     if value := data.get("value", None):  # If value is already set (by qr for example)
         if isinstance(value, Decimal):
-            await finish_expense_create(message, state, value)
+            await finish_expense_create(message, category, value, state)
             return
+
+    await state.set_data({})
+    await state.update_data(category=category)
 
     await message.answer("💸 Enter the value of the expense.", reply_markup=types.ReplyKeyboardRemove())
     await state.set_state(CreateExpense.set_value)
@@ -92,14 +97,13 @@ async def process_value(message: types.Message, state: FSMContext):
         )
         return
 
+    category = (await state.get_data())["category"]
     value = Decimal(message.text.replace(",", "."))
 
-    await finish_expense_create(message, state, value)
+    await finish_expense_create(message, category, value, state)
 
 
-async def finish_expense_create(message: types.Message, state, value: Decimal):
-    category = (await state.get_data())["category"]
-
+async def finish_expense_create(message: types.Message, category: Category, value: Decimal, state: FSMContext):
     await ExpenseCRUD.create_by(
         ExpensePayload(
             category_id=category.id,
@@ -111,10 +115,11 @@ async def finish_expense_create(message: types.Message, state, value: Decimal):
     success = await message.answer(
         **Text(
             "✅ Expense in category ", Bold(category.name), f" for {value}BGN created successfully!"
-        ).as_kwargs()
+        ).as_kwargs(),
+        reply_markup=types.ReplyKeyboardRemove()
     )
-    await state.clear()
 
+    await state.clear()
     await get_daily(message)
     await sleep(5)
     await success.delete()
