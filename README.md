@@ -6,12 +6,19 @@ Minimalistic telegram bot for managing expenses. Made with love 💘
 
 1. Set up and activate your virtual environment. For example:
 
+Linux
+```bash
+python -m venv .venv &&
+source .venv/bin/activate
+```
+
+Windows
 ```bash
 python -m venv .venv &&
 .venv\Scripts\activate
 ```
 
-2. Set `DB_URL` and `BOT_TOKEN` environmental variables in format (for supported databases
+2. Set `DB_URL` and `BOT_TOKEN` (telegram bot token) environmental variables in format (for supported databases
    visit [tortoise docs](https://tortoise.github.io/databases.html)):
 
 ```
@@ -23,6 +30,11 @@ BOT_TOKEN=SUPER_SECRET_TOKEN
 
 ```
 pip install -r requirements.txt
+```
+
+4. Run
+```
+python main.py
 ```
 
 ## License
